@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from 'react';
-
+import { useEffect, useState } from 'react';
 import Header from "@/components/Header";
 
 const colors = ['red', 'blue', 'green', 'yellow'] as const;
@@ -21,6 +20,17 @@ export default function GamePage() {
   const [message, setMessage] = useState('');
   const [activeColor, setActiveColor] = useState<Color | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [round, setRound] = useState(0);
+  const [highScore, setHighScore] = useState(0);
+  const [gameOver, setGameOver] = useState(false);
+
+  // Load high score from localStorage on initial load
+  useEffect(() => {
+    const storedHighScore = localStorage.getItem('highScore');
+    if (storedHighScore) {
+      setHighScore(parseInt(storedHighScore));
+    }
+  }, []);
 
   const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
@@ -31,6 +41,8 @@ export default function GamePage() {
 
   const startGame = async () => {
     setMessage('');
+    setGameOver(false);
+    setRound(1);
     const newSequence: Color[] = [];
     setGameSequence(newSequence);
     setUserSequence([]);
@@ -44,11 +56,11 @@ export default function GamePage() {
     setUserSequence([]);
     setIsUserTurn(false);
     setIsPlaying(true);
-    setMessage('👀 Observe the animation');
+    setMessage(`👀 Round ${round} - Watch closely!`);
     await showSequence(updatedSequence);
     setIsPlaying(false);
     setIsUserTurn(true);
-    setMessage('👉 Try the sequence now');
+    setMessage(`👉 Round ${round} - Your turn!`);
   };
 
   const showSequence = async (sequence: Color[]) => {
@@ -71,33 +83,71 @@ export default function GamePage() {
 
     const currentStep = updatedUserSequence.length - 1;
     if (color !== gameSequence[currentStep]) {
-      setMessage('❌ Wrong! Game Over.');
       playSound('/sounds/gameover.mp3');
+      const finalRound = round - 1;
+
+      setMessage(`❌ Wrong! Game Over. You passed ${finalRound} round(s).`);
       setIsUserTurn(false);
+      setGameOver(true);
+
+      // Save high score if beaten
+      if (finalRound > highScore) {
+        setHighScore(finalRound);
+        localStorage.setItem('highScore', finalRound.toString());
+      }
+
+      // Store round history
+      const history = JSON.parse(localStorage.getItem('roundHistory') || '[]');
+      history.push(finalRound);
+      localStorage.setItem('roundHistory', JSON.stringify(history));
+
       return;
     }
 
     if (updatedUserSequence.length === gameSequence.length) {
-      setMessage('✅ Correct! Next Round...');
       playSound('/sounds/correct.mp3');
       setIsUserTurn(false);
+      setMessage('✅ Correct! Get ready for the next round...');
       await delay(1000);
+      setRound((prev) => prev + 1);
       setMessage('');
       nextRound(gameSequence);
     }
   };
 
+  const handlePlayAgain = () => {
+    setRound(0);
+    startGame();
+  };
+
   return (
     <>
       <Header />
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100">
-        <h1 className="text-3xl font-bold mb-6">🎯 Color Memory Game</h1>
-        <button
-          onClick={startGame}
-          className="mb-6 px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
-        >
-          Start Game
-        </button>
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-100 p-4">
+        <h1 className="text-3xl font-bold mb-4">🎯 Color Memory Game</h1>
+
+        {!isPlaying && !isUserTurn && !gameSequence.length && (
+          <button
+            onClick={startGame}
+            className="mb-4 px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          >
+            Start Game
+          </button>
+        )}
+
+        {gameOver && (
+          <button
+            onClick={handlePlayAgain}
+            className="mb-4 px-6 py-2 bg-green-500 text-white rounded hover:bg-green-600"
+          >
+            🔁 Play Again
+          </button>
+        )}
+
+        <div className="flex space-x-6 mb-6">
+          <p className="text-lg">🏁 Round: {round}</p>
+          <p className="text-lg">🏆 High Score: {highScore}</p>
+        </div>
 
         <div className="flex space-x-4 mb-6">
           {colors.map((color) => (
@@ -116,7 +166,7 @@ export default function GamePage() {
           ))}
         </div>
 
-        <p className="text-xl font-medium">{message}</p>
+        <p className="text-xl font-medium text-center max-w-md">{message}</p>
       </div>
     </>
   );
