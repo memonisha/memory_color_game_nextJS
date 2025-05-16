@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Memory Color Game",
+  title: "Simon Says🗣️ - Color Memory Game🎨",
   description: "A fun game to test your memory with colors!",
 };
 
